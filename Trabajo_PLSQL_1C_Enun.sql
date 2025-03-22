@@ -11,7 +11,12 @@ DROP SEQUENCE seq_pedidos;
 
 
 
-create sequence seq_pedidos;
+CREATE SEQUENCE seq_pedidos
+    START WITH 1       -- Empieza desde 1
+    INCREMENT BY 1     -- Aumenta de 1 en 1
+    NOMAXVALUE         -- Sin límite máximo
+    NOCYCLE            -- No se reinicia
+    CACHE 20;          -- Guarda 20 valores en caché para optimizar rendimiento
 
 CREATE TABLE clientes (
     id_cliente INTEGER PRIMARY KEY,
