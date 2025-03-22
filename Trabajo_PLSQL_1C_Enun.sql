@@ -115,12 +115,13 @@ create or replace procedure registrar_pedido(
     END IF;
     
     --Comprobar que el personal tiene suficientes pedidos
-    SELECT pedidos_activos INTO varPersonalDisponible FROM personal_servicio 
-        WHERE id_personal = arg_id_personal;
-    IF varPersonalDisponible > 5
+    SELECT pedidos_activos INTO varPersonalDisponible FROM personal_servicio --P4.1
+        WHERE id_personal = arg_id_personal
+        FOR UPDATE; --P4.2 usamos el for update para evitar que otro proceso modifique pedidos_activos
+    IF varPersonalDisponible >  5 --P4.1 aqui se comprueba que el personal no tiene mas de 5 platos
     THEN 
         ROLLBACK;
-        raise_application_error(-20003, msg_personal_sin_platos);
+        raise_application_error(-20003, msg_personal_ocupado);
     END IF;
  
     --Comprobar que el primer plato existe
