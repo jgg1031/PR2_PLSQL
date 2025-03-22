@@ -162,15 +162,16 @@ end;
 ------ Deja aquí tus respuestas a las preguntas del enunciado:
 -- NO SE CORREGIRÁN RESPUESTAS QUE NO ESTÉN AQUÍ (utiliza el espacio que necesites apra cada una)
 -- * P4.1
---
+--  Para garantizar que un miembro del personal no supera el límite de pedidos activos lo definimos en el procedimiento 'registrar_pedido'. Antes de registrar el pedido se verifica cuantos pedidos activos tiene el miembro del personal, si es mayor a 5 se lanza una excepción que impide la asignacion del pedido. 
 -- * P4.2
---
+--  Para evitar este suceso, utilizaremos una cláusula (SELECT ... FOR UPDATE). De esta manera se bloquea la fila del personal de servicio evitando que otro proceso modifique 'pedidos_activos' simultanea.
 -- * P4.3
 --
 -- * P4.4
 --
 -- * P4.5
 -- 
+
 
 
 create or replace
