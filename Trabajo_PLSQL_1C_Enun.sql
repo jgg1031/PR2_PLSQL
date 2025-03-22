@@ -58,8 +58,86 @@ create or replace procedure registrar_pedido(
     arg_id_primer_plato INTEGER DEFAULT NULL,
     arg_id_segundo_plato INTEGER DEFAULT NULL
 ) is 
+    --Declaración de excepciones
+    plato_no_disponible exception;
+    pragma exception_init(plato_no_disponible, -20001);
+    msg_plato_no_disponible constant varchar(50) := 'Uno de los plato seleccionado no está disponible';
+    
+    pedido_sin_platos exception;
+    pragma exception_init(pedido_sin_platos, -20002);
+    msg_pedido_sin_platos constant varchar(50) := 'El pedido debe contener al menos un plato';
+    
+    personal_ocupado exception;
+    pragma execption_init(personal_ocupado, -20003);
+    msg_personal_ocupado constant varchar(50) := 'El personal de servicio tiene demasiados pedidos';
+    
+    plato_inexistente exception;
+    pragma exception_init(plato_inexistente, -20004);
+    msg_plato_inexistente_plato1 constant varchar(50) := 'El primer plato seleccionado no existe';
+    msg_plato_inexistente_plato2 constant varchar(50) := 'El segundo plato seleccionado no existe';
+    
+    --Declaración de cursores
+    CURSOR vPlato1Disponible IS 
+        SELECT * FROM platos WHERE id_plato = arg_id_primer_plato;
+    fPlato1Disponible platos%ROWTYPE; 
+    
+    CURSOR vPlato2Disponible IS
+        SELECT * FROM platos WHERE id_plato = arg_id_segundo_plato;
+    fPlato2Disponible platos%ROWTYPE;
+        
+    --Personal disponible
+    varPersonalDisponible personal_servicio.pedidos_activos%type;
+    
+    
+    
  begin
-  null; -- sustituye esta línea por tu código
+    --Comprobar que se pasan al menos un plato
+    IF arg_id_primer_plato IS NULL AND arg_id_segundo_plato IS NULL
+    THEN
+        ROLLBACK;
+        raise_application_error(-20002, msg_pedido_sin_platos);
+    END IF;
+ 
+    --Comprobar que el primer plato existe
+    OPEN vPlato1Disponible;
+    FETCH vPlato1Disponible INTO fPlato1Disponible;
+    IF fPlato1Disponible%NOTFOUND
+    THEN
+        CLOSE vPlato1Disponible;
+        ROLLBACK;
+        raise_application_error(-20004, msg_plato_inexistente_plato1);
+    END IF;
+    
+    --Comprobar que el segundo plato existe
+    OPEN vPlato2Disponible;
+    FETCH vPlato2Disponible INTO fPlato2Disponible;
+    IF fPlato2Disponible%NOTFOUND
+    THEN
+        CLOSE vPlato2Disponible;
+        ROLLBACK;
+        raise_application_error(-20004, msg_plato_inexistente_plato2);
+    END IF;
+    
+    --Comprobar que los platos están disponibles
+    IF vPlato1Disponible.Disponible = 0 OR vPlato2Disponible.Disponible = 0
+    THEN
+        CLOSE vPlato1Disponible;
+        CLOSE vPlato2Disponible;
+        ROLLBACK;
+        raise_application_error(-20001, msg_plato_no_disponible);
+    END IF;
+    
+    --Comprobar que el personal tiene suficientes pedidos
+    SELECT pedidos_activos INTO varPersonalDisponible FROM personal_servicio 
+        WHERE id_personal = arg_id_personal;
+    IF varPersonalDisponible > 5
+    THEN 
+        ROLLBACK;
+        raise_application_error(-20003, msg_personal_sin_platos);
+    END IF;
+    
+  
+  
 end;
 /
 
