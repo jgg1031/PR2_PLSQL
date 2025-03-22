@@ -73,7 +73,7 @@ create or replace procedure registrar_pedido(
     msg_pedido_sin_platos constant varchar(50) := 'El pedido debe contener al menos un plato';
     
     personal_ocupado exception;
-    pragma execption_init(personal_ocupado, -20003);
+    pragma exception_init(personal_ocupado, -20003);
     msg_personal_ocupado constant varchar(50) := 'El personal de servicio tiene demasiados pedidos';
     
     plato_inexistente exception;
@@ -83,23 +83,33 @@ create or replace procedure registrar_pedido(
     
     --Declaración de cursores
     CURSOR vPlato1Disponible IS 
-        SELECT * FROM platos WHERE id_plato = arg_id_primer_plato;
-    fPlato1Disponible platos%ROWTYPE; 
+        SELECT id_plato, disponible FROM platos WHERE id_plato = arg_id_primer_plato;
+
+    varIdPlato1 platos.id_plato%type;
+    varPlatoDisponible1 platos.disponible%type;
     
     CURSOR vPlato2Disponible IS
-        SELECT * FROM platos WHERE id_plato = arg_id_segundo_plato;
-    fPlato2Disponible platos%ROWTYPE;
+        SELECT id_plato, disponible FROM platos WHERE id_plato = arg_id_segundo_plato;
+
+    varIdPlato2 platos.id_plato%type;
+    varPlatoDisponible2 platos.disponible%type;
         
     --Personal disponible
     varPersonalDisponible personal_servicio.pedidos_activos%type;
     
     varTotalPedido pedidos.total%type;
-    
-    
+    var_id_pedido pedidos.id_pedido%type;
     
  begin
+    
+    OPEN vPlato1Disponible;
+    FETCH vPlato1Disponible INTO varIdPlato1, varPlatoDisponible1;
+    
+    OPEN vPlato2Disponible;
+    FETCH vPlato2Disponible INTO varIdPlato2, varPlatoDisponible2;
+    
     --Comprobar que los platos están disponibles
-    IF vPlato1Disponible.disponible = 0 OR vPlato2Disponible.disponible = 0
+    IF NVL(varPlatoDisponible1, 1) = 0 OR NVL(varPlatoDisponible2, 1) = 0
     THEN
         CLOSE vPlato1Disponible;
         CLOSE vPlato2Disponible;
@@ -120,13 +130,11 @@ create or replace procedure registrar_pedido(
     IF varPersonalDisponible > 5
     THEN 
         ROLLBACK;
-        raise_application_error(-20003, msg_personal_sin_platos);
+        raise_application_error(-20003, msg_personal_ocupado);
     END IF;
  
     --Comprobar que el primer plato existe
-    OPEN vPlato1Disponible;
-    FETCH vPlato1Disponible INTO fPlato1Disponible;
-    IF fPlato1Disponible%NOTFOUND
+    IF varIdPlato1 IS NULL
     THEN
         CLOSE vPlato1Disponible;
         ROLLBACK;
@@ -134,9 +142,7 @@ create or replace procedure registrar_pedido(
     END IF;
     
     --Comprobar que el segundo plato existe
-    OPEN vPlato2Disponible;
-    FETCH vPlato2Disponible INTO fPlato2Disponible;
-    IF fPlato2Disponible%NOTFOUND
+    IF varIdPlato2 IS NULL
     THEN
         CLOSE vPlato2Disponible;
         ROLLBACK;
@@ -145,12 +151,12 @@ create or replace procedure registrar_pedido(
     
     var_id_pedido := seq_pedidos.NEXTVAL;
   --Obtener la suma del total del pedido
-  SELECT SUM(precio) INTO varTotalPedido FROM platos WHERE id_plato = arg_id_primer_plato AND id_plato = arg_id_segundo_plato;
+  SELECT SUM(precio) INTO varTotalPedido FROM platos WHERE id_plato IN (arg_id_primer_plato, arg_id_segundo_plato);
   --Añadir pedido a la tabla de pedidos
-  INSERT INTO pedidos (id_pedido, id_cliente, id_personal, fecha_pedido, total) VALUES(var_id_pedido ,arg_id_cliente, arg_id_personal, CURRDATE, varTotalPedido);
+  INSERT INTO pedidos (id_pedido, id_cliente, id_personal, fecha_pedido, total) VALUES(var_id_pedido ,arg_id_cliente, arg_id_personal, SYSDATE, varTotalPedido);
   --Añadir los detalles del pedido
-  INSERT INTO detalles_pedidos VALUES(var_id_pedido, arg_id_primer_plato);
-  INSERT INTO detalles_pedidos VALUES(var_id_pedido, arg_id_segundo_plato);
+  INSERT INTO detalles_pedido VALUES(var_id_pedido, arg_id_primer_plato);
+  INSERT INTO detalles_pedido VALUES(var_id_pedido, arg_id_segundo_plato);
   
   --Añadir un pedido mas al personal
   UPDATE personal_servicio SET pedidos_activos = ((SELECT pedidos_activos FROM personal_servicio WHERE id_personal = arg_id_personal) + 1) WHERE id_personal = arg_id_personal;
