@@ -88,14 +88,34 @@ create or replace procedure registrar_pedido(
     --Personal disponible
     varPersonalDisponible personal_servicio.pedidos_activos%type;
     
+    varTotalPedido pedidos.total%type;
+    
     
     
  begin
+    --Comprobar que los platos están disponibles
+    IF vPlato1Disponible.disponible = 0 OR vPlato2Disponible.disponible = 0
+    THEN
+        CLOSE vPlato1Disponible;
+        CLOSE vPlato2Disponible;
+        ROLLBACK;
+        raise_application_error(-20001, msg_plato_no_disponible);
+    END IF;
+    
     --Comprobar que se pasan al menos un plato
     IF arg_id_primer_plato IS NULL AND arg_id_segundo_plato IS NULL
     THEN
         ROLLBACK;
         raise_application_error(-20002, msg_pedido_sin_platos);
+    END IF;
+    
+    --Comprobar que el personal tiene suficientes pedidos
+    SELECT pedidos_activos INTO varPersonalDisponible FROM personal_servicio 
+        WHERE id_personal = arg_id_personal;
+    IF varPersonalDisponible > 5
+    THEN 
+        ROLLBACK;
+        raise_application_error(-20003, msg_personal_sin_platos);
     END IF;
  
     --Comprobar que el primer plato existe
@@ -118,24 +138,17 @@ create or replace procedure registrar_pedido(
         raise_application_error(-20004, msg_plato_inexistente_plato2);
     END IF;
     
-    --Comprobar que los platos están disponibles
-    IF vPlato1Disponible.Disponible = 0 OR vPlato2Disponible.Disponible = 0
-    THEN
-        CLOSE vPlato1Disponible;
-        CLOSE vPlato2Disponible;
-        ROLLBACK;
-        raise_application_error(-20001, msg_plato_no_disponible);
-    END IF;
-    
-    --Comprobar que el personal tiene suficientes pedidos
-    SELECT pedidos_activos INTO varPersonalDisponible FROM personal_servicio 
-        WHERE id_personal = arg_id_personal;
-    IF varPersonalDisponible > 5
-    THEN 
-        ROLLBACK;
-        raise_application_error(-20003, msg_personal_sin_platos);
-    END IF;
-    
+    var_id_pedido := seq_pedidos.NEXTVAL;
+  --Obtener la suma del total del pedido
+  SELECT SUM(precio) INTO varTotalPedido FROM platos WHERE id_plato = arg_id_primer_plato AND id_plato = arg_id_segundo_plato;
+  --Añadir pedido a la tabla de pedidos
+  INSERT INTO pedidos (id_pedido, id_cliente, id_personal, fecha_pedido, total) VALUES(var_id_pedido ,arg_id_cliente, arg_id_personal, CURRDATE, varTotalPedido);
+  --Añadir los detalles del pedido
+  INSERT INTO detalles_pedidos VALUES(var_id_pedido, arg_id_primer_plato);
+  INSERT INTO detalles_pedidos VALUES(var_id_pedido, arg_id_segundo_plato);
+  
+  --Añadir un pedido mas al personal
+  UPDATE personal_servicio SET pedidos_activos = ((SELECT pedidos_activos FROM personal_servicio WHERE id_personal = arg_id_personal) + 1) WHERE id_personal = arg_id_personal;
   
   
 end;
