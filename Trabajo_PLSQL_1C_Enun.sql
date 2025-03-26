@@ -170,12 +170,18 @@ end;
 -- NO SE CORREGIRÁN RESPUESTAS QUE NO ESTÉN AQUÍ (utiliza el espacio que necesites apra cada una)
 -- * P4.1
 --  Para garantizar que un miembro del personal no supera el límite de pedidos activos lo definimos en el procedimiento 'registrar_pedido'. Antes de registrar el pedido se verifica cuantos pedidos activos tiene el miembro del personal, si es mayor a 5 se lanza una excepción que impide la asignacion del pedido. 
+
 -- * P4.2
 --  Para evitar este suceso, utilizaremos una cláusula (SELECT ... FOR UPDATE). De esta manera se bloquea la fila del personal de servicio evitando que otro proceso modifique 'pedidos_activos' simultanea.
+
 -- * P4.3
 --  
+
 -- * P4.4
---
+-- Si se añade `CHECK (pedidos_activos <= 5)`, la base de datos bloqueará valores inválidos, pero el procedimiento debe capturar el error. Por ejemplo, con `pedidos_activos = 0`, 
+-- los primeros pedidos se aceptan, pero al intentar un sexto, la restricción fallará. Para controlarlo, se debe capturar la excepción y lanzar `raise_application_error(-20003)`, 
+-- asegurando un manejo adecuado en PL/SQL.
+
 -- * P4.5
 -- En el código se usa programación defensiva, lo que significa que primero se hacen varias validaciones antes de modificar la base de datos, por ejemplo, 
 -- se revisa que los platos estén disponibles antes de agregarlos al pedido, que el personal no tenga más de 5 pedidos activos y que al menos se haya seleccionado un plato
