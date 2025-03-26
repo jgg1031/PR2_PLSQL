@@ -63,7 +63,7 @@ create or replace procedure registrar_pedido(
     arg_id_primer_plato INTEGER DEFAULT NULL,
     arg_id_segundo_plato INTEGER DEFAULT NULL
 ) is 
-    --Declaración de excepciones
+    --Declaración de excepciones P4.5 (uso de excepciones propias)
     plato_no_disponible exception;
     pragma exception_init(plato_no_disponible, -20001);
     msg_plato_no_disponible constant varchar(50) := 'Uno de los plato seleccionado no está disponible';
@@ -108,7 +108,7 @@ create or replace procedure registrar_pedido(
     OPEN vPlato2Disponible;
     FETCH vPlato2Disponible INTO varIdPlato2, varPlatoDisponible2;
     
-    --Comprobar que los platos están disponibles
+    --Comprobar que los platos están disponibles P4.5(Comprobaciones previas)
     IF NVL(varPlatoDisponible1, 1) = 0 OR NVL(varPlatoDisponible2, 1) = 0
     THEN
         CLOSE vPlato1Disponible;
@@ -120,7 +120,7 @@ create or replace procedure registrar_pedido(
     --Comprobar que se pasan al menos un plato
     IF arg_id_primer_plato IS NULL AND arg_id_segundo_plato IS NULL
     THEN
-        ROLLBACK;
+        ROLLBACK; --P4.5 (Rollback para evitar estados incorrectos)
         raise_application_error(-20002, msg_pedido_sin_platos);
     END IF;
     
@@ -147,7 +147,7 @@ create or replace procedure registrar_pedido(
     THEN
         CLOSE vPlato2Disponible;
         ROLLBACK;
-        raise_application_error(-20004, msg_plato_inexistente_plato2);
+        raise_application_error(-20004, msg_plato_inexistente_plato2); --P4.5 (mostramos mensajes claros con el tipo de error)
     END IF;
     
     var_id_pedido := seq_pedidos.NEXTVAL;
@@ -173,11 +173,15 @@ end;
 -- * P4.2
 --  Para evitar este suceso, utilizaremos una cláusula (SELECT ... FOR UPDATE). De esta manera se bloquea la fila del personal de servicio evitando que otro proceso modifique 'pedidos_activos' simultanea.
 -- * P4.3
---
+--  
 -- * P4.4
 --
 -- * P4.5
--- 
+-- En el código se usa programación defensiva, lo que significa que primero se hacen varias validaciones antes de modificar la base de datos, por ejemplo, 
+-- se revisa que los platos estén disponibles antes de agregarlos al pedido, que el personal no tenga más de 5 pedidos activos y que al menos se haya seleccionado un plato
+-- (pedido_sin_platos). También se aplican transacciones y manejo de excepciones, lo que ayuda a evitar errores y mantener la base de datos en orden, si algo falla, 
+-- se usa ROLLBACK para que los datos no queden en un estado incorrecto; además, hay excepciones específicas (plato_no_disponible, pedido_sin_platos, personal_ocupado, plato_inexistente)
+-- que permiten controlar mejor los errores y RAISE_APPLICATION_ERROR para mostrar mensajes claros cuando ocurre un problema.
 
 
 
