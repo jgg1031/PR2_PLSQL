@@ -358,9 +358,40 @@ begin
     
     
     --Test5: Primer plato no existe Err: -20004
-    
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('Test5: Segundo plato no existe-----');
+        registrar_pedido(1,1,2,4);
+        commit;
+        dbms_output.put_line('MAL: El pedido usa un segundo plato que no existe.');
+        exception
+            when others then
+                if SQLCODE = -20004 then
+                    dbms_output.put_line('BIEN: El segunod plato no se usa correctamente.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                else
+                    dbms_output.put_line('MAL: Da error pero no detecta que el segundo plato no existe.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                end if;
+    end;
     
     --Test6: El pedido se hace correctamente
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('Test6: Pedido exitoso-----');
+        registrar_pedido(1,1,1,2);
+        commit;
+        dbms_output.put_line('BIEN: El pedido se realiza con éxito.');
+        exception
+            when others then
+                dbms_output.put_line('MAL: Da error en la inserción del pedido.');
+                dbms_output.put_line('Error nro ' || SQLCODE);
+                dbms_output.put_line('Mensaje ' || SQLERRM);
+    end;
     
   
 end;
