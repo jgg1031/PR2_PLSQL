@@ -190,6 +190,10 @@ create or replace procedure registrar_pedido(
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20003, msg_personal_ocupado);
     
+    WHEN plato_inexistente THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20004, SQLERRM);
+        
     WHEN OTHERS THEN
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20099, 'Error inesperado: ' || SQLERRM);
@@ -207,7 +211,8 @@ end;
 --  De esta manera se bloquea la fila del personal de servicio evitando que otro proceso modifique 'pedidos_activos' simultanea.
 
 -- * P4.3
---  
+--  Para evitar que ocurran inconsistencias, usamos la misma estrategia que en la pregunta 3, pero para las demás consultas, así antes de realizar cualquier modificación en las inserciones, tenemos bloqueadas las filas que van a 
+--  ser modificadas o consultadas por otras sesiones.
 
 -- * P4.4
 -- Si se añade `CHECK (pedidos_activos <= 5)`, la base de datos bloqueará valores inválidos, pero el procedimiento debe capturar el error. Por ejemplo, con `pedidos_activos = 0`, 
@@ -355,7 +360,26 @@ begin
     end;
     
     --Test4: Primer plato no existe Err: -20004
-    
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('Test4: Primer plato no existe-----');
+        registrar_pedido(1,1,4,2);
+        commit;
+        dbms_output.put_line('MAL: El pedido usa un primer plato que no existe.');
+        exception
+            when others then
+                if SQLCODE = -20004 then
+                    dbms_output.put_line('BIEN: El primer plato no se usa correctamente.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                else
+                    dbms_output.put_line('MAL: Da error pero no detecta que el primer plato no existe.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                end if;
+    end;
+
     
     --Test5: Primer plato no existe Err: -20004
     begin
