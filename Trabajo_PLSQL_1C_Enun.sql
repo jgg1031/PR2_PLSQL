@@ -68,6 +68,8 @@ create or replace procedure registrar_pedido(
     msg_personal_ocupado constant varchar2(50) := 'El personal de servicio tiene demasiados pedidos';
     msg_plato_inexistente_plato1 constant varchar2(50) := 'El primer plato seleccionado no existe';
     msg_plato_inexistente_plato2 constant varchar2(50) := 'El segundo plato seleccionado no existe';
+    msg_personal_no_existe constant varchar2(50) := 'El personal seleccionado no existe';
+    msg_cliente_no_existe constant varchar2(50) := 'El cliente elegido no existe';
     
     --Declaración de excepciones P4.5 (uso de excepciones propias)
     plato_no_disponible exception;
@@ -78,6 +80,10 @@ create or replace procedure registrar_pedido(
     pragma exception_init(personal_ocupado, -20003);
     plato_inexistente exception;
     pragma exception_init(plato_inexistente, -20004);
+    personal_inexistente exception;
+    pragma exception_init(personal_inexistente, -20005);
+    cliente_inexistente exception;
+    pragma exception_init(cliente_inexistente, -20006);
     
     --VARIABLES    
     --Declaración de cursores
@@ -95,6 +101,8 @@ create or replace procedure registrar_pedido(
     varPersonalDisponible personal_servicio.pedidos_activos%type;
     varTotalPedido PEDIDOS.total%type;
     var_id_pedido PEDIDOS.id_pedido%type;
+    varIdCliente clientes.id_cliente%type;
+    
 begin
     -- Comprobar que al menos un plato ha sido seleccionado
     IF arg_id_primer_plato IS NULL AND arg_id_segundo_plato IS NULL THEN
@@ -132,16 +140,34 @@ begin
             RAISE_APPLICATION_ERROR(-20001, msg_plato_no_disponible);
         END IF;
     END IF;
-
-    -- Verificar disponibilidad del personal de servicio
-    SELECT pedidos_activos INTO varPersonalDisponible 
-    FROM personal_servicio 
-    WHERE id_personal = arg_id_personal
-    FOR UPDATE;
-
-    IF varPersonalDisponible >= 5 THEN
-        RAISE personal_ocupado;
-    END IF;
+    
+    -- Verificar disponibilidad del personal de servicio y si existe.
+    BEGIN
+        SELECT pedidos_activos INTO varPersonalDisponible 
+        FROM personal_servicio 
+        WHERE id_personal = arg_id_personal
+        FOR UPDATE;
+        
+        IF varPersonalDisponible >= 5 THEN
+            RAISE personal_ocupado;
+        END IF;
+    
+    EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20005, msg_personal_no_existe);
+    
+    END;
+    
+    --Verificar que el cliente existe
+    BEGIN
+        SELECT id_cliente INTO varIdCliente 
+        FROM CLIENTES 
+        WHERE id_cliente = arg_id_cliente;  
+        
+    EXCEPTION 
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20006, msg_cliente_no_existe);
+    END;
     
     -- Obtener ID del pedido
     var_id_pedido := seq_pedidos.NEXTVAL;
@@ -189,6 +215,14 @@ EXCEPTION
     WHEN plato_inexistente THEN
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20004, SQLERRM);
+    
+    WHEN personal_inexistente THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20005, msg_personal_no_existe);
+    
+    WHEN cliente_inexistente THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20006, msg_cliente_no_existe);
         
     WHEN OTHERS THEN
         ROLLBACK;
@@ -295,6 +329,7 @@ begin
     begin
         inicializa_test;
         dbms_output.put_line('');
+        dbms_output.put_line('--------------------------------------------------------------------------');
         dbms_output.put_line('Test1: Un plato no está disponible');
         registrar_pedido(1,1,2,3);
         commit;
@@ -310,12 +345,14 @@ begin
                     dbms_output.put_line('Error nro ' || SQLCODE);
                     dbms_output.put_line('Mensaje ' || SQLERRM);
                 end if;
+        dbms_output.put_line('--------------------------------------------------------------------------');
     end;
     
     --Test2: Plato no disponible Err: -20002
     begin
         inicializa_test;
         dbms_output.put_line('');
+        dbms_output.put_line('--------------------------------------------------------------------------');
         dbms_output.put_line('Test2: El pedido tiene que contener al menos un plato');
         registrar_pedido(1,1,null,null);
         commit;
@@ -331,12 +368,14 @@ begin
                     dbms_output.put_line('Error nro ' || SQLCODE);
                     dbms_output.put_line('Mensaje ' || SQLERRM);
                 end if;
+        dbms_output.put_line('--------------------------------------------------------------------------');
     end;
     
     --Test3: Personal con demasiados pedidos Err: -20003
     begin
         inicializa_test;
         dbms_output.put_line('');
+        dbms_output.put_line('--------------------------------------------------------------------------');
         dbms_output.put_line('Test3: Personal de servicio con demasiados pedidos');
         registrar_pedido(1,2,1,2);
         commit;
@@ -352,12 +391,14 @@ begin
                     dbms_output.put_line('Error nro ' || SQLCODE);
                     dbms_output.put_line('Mensaje ' || SQLERRM);
                 end if;
+        dbms_output.put_line('--------------------------------------------------------------------------');
     end;
     
     --Test4: Primer plato no existe Err: -20004
     begin
         inicializa_test;
         dbms_output.put_line('');
+        dbms_output.put_line('--------------------------------------------------------------------------');
         dbms_output.put_line('Test4: Primer plato no existe');
         registrar_pedido(1,1,4,2);
         commit;
@@ -373,20 +414,22 @@ begin
                     dbms_output.put_line('Error nro ' || SQLCODE);
                     dbms_output.put_line('Mensaje ' || SQLERRM);
                 end if;
+        dbms_output.put_line('--------------------------------------------------------------------------');
     end;
     
     --Test5: Primer plato no existe Err: -20004
     begin
         inicializa_test;
         dbms_output.put_line('');
-        dbms_output.put_line('Test5: Segundo plato no existe-----');
+        dbms_output.put_line('--------------------------------------------------------------------------');
+        dbms_output.put_line('Test5: Segundo plato no existe');
         registrar_pedido(1,1,2,4);
         commit;
         dbms_output.put_line('MAL: El pedido usa un segundo plato que no existe.');
         exception
             when others then
                 if SQLCODE = -20004 then
-                    dbms_output.put_line('BIEN: El segunod plato no se usa correctamente.');
+                    dbms_output.put_line('BIEN: El segundo plato no se usa correctamente.');
                     dbms_output.put_line('Error nro ' || SQLCODE);
                     dbms_output.put_line('Mensaje ' || SQLERRM);
                 else
@@ -394,13 +437,15 @@ begin
                     dbms_output.put_line('Error nro ' || SQLCODE);
                     dbms_output.put_line('Mensaje ' || SQLERRM);
                 end if;
+        dbms_output.put_line('--------------------------------------------------------------------------');
     end;
     
     --Test6: El pedido se hace correctamente
     begin
         inicializa_test;
         dbms_output.put_line('');
-        dbms_output.put_line('Test6: Pedido exitoso-----');
+        dbms_output.put_line('--------------------------------------------------------------------------');
+        dbms_output.put_line('Test6: Pedido exitoso');
         registrar_pedido(1,1,1,2);
         commit;
         dbms_output.put_line('BIEN: El pedido se realiza con éxito.');
@@ -409,6 +454,53 @@ begin
                 dbms_output.put_line('MAL: Da error en la inserción del pedido.');
                 dbms_output.put_line('Error nro ' || SQLCODE);
                 dbms_output.put_line('Mensaje ' || SQLERRM);
+        dbms_output.put_line('--------------------------------------------------------------------------');
+    end;
+    
+    --Test7: El personal no existe Err: -20005
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('--------------------------------------------------------------------------');
+        dbms_output.put_line('Test7: El personal no existe');
+        registrar_pedido(1,7,2,1);
+        commit;
+        dbms_output.put_line('MAL: El pedido usa un personal que no existe.');
+        exception
+            when others then
+                if SQLCODE = -20005 then
+                    dbms_output.put_line('BIEN: El personal no se usa correctamente.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                else
+                    dbms_output.put_line('MAL: Da error pero no detecta que el personal no existe.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                end if;
+        dbms_output.put_line('--------------------------------------------------------------------------');
+    end;
+    
+    --Test8: El cliente no existe Err: -20006
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('--------------------------------------------------------------------------');
+        dbms_output.put_line('Test8: Segundo plato no existe');
+        registrar_pedido(7,1,2,1);
+        commit;
+        dbms_output.put_line('MAL: El pedido usa un cliente que no existe.');
+        exception
+            when others then
+                if SQLCODE = -20006 then
+                    dbms_output.put_line('BIEN: El cliente no se usa correctamente.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                else
+                    dbms_output.put_line('MAL: Da error pero no detecta que el cliente no existe.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                end if;
+        dbms_output.put_line('--------------------------------------------------------------------------');
     end;
     
 end;
