@@ -53,8 +53,6 @@ CREATE TABLE detalle_pedido (
     cantidad INTEGER NOT NULL,
     PRIMARY KEY (id_pedido, id_plato)
 );
-
-
 	
 -- Procedimiento a implementar para realizar la reserva
 create or replace procedure registrar_pedido(
@@ -62,14 +60,14 @@ create or replace procedure registrar_pedido(
     arg_id_personal     INTEGER, 
     arg_id_primer_plato INTEGER DEFAULT NULL,
     arg_id_segundo_plato INTEGER DEFAULT NULL
-) is 
+) is
     --EXCEPCIONES
     --Mensajes de excepciones
-    msg_plato_no_disponible constant varchar(50) := 'Uno de los plato seleccionado no está disponible';
-    msg_pedido_sin_platos constant varchar(50) := 'El pedido debe contener al menos un plato';
-    msg_personal_ocupado constant varchar(50) := 'El personal de servicio tiene demasiados pedidos';
-    msg_plato_inexistente_plato1 constant varchar(50) := 'El primer plato seleccionado no existe';
-    msg_plato_inexistente_plato2 constant varchar(50) := 'El segundo plato seleccionado no existe';
+    msg_plato_no_disponible constant varchar2(50) := 'Uno de los plato seleccionado no está disponible';
+    msg_pedido_sin_platos constant varchar2(50) := 'El pedido debe contener al menos un plato';
+    msg_personal_ocupado constant varchar2(50) := 'El personal de servicio tiene demasiados pedidos';
+    msg_plato_inexistente_plato1 constant varchar2(50) := 'El primer plato seleccionado no existe';
+    msg_plato_inexistente_plato2 constant varchar2(50) := 'El segundo plato seleccionado no existe';
     
     --Declaración de excepciones P4.5 (uso de excepciones propias)
     plato_no_disponible exception;
@@ -97,9 +95,7 @@ create or replace procedure registrar_pedido(
     varPersonalDisponible personal_servicio.pedidos_activos%type;
     varTotalPedido PEDIDOS.total%type;
     var_id_pedido PEDIDOS.id_pedido%type;
-    
- begin
-    
+begin
     -- Comprobar que al menos un plato ha sido seleccionado
     IF arg_id_primer_plato IS NULL AND arg_id_segundo_plato IS NULL THEN
         RAISE pedido_sin_platos;
@@ -126,12 +122,12 @@ create or replace procedure registrar_pedido(
         OPEN vPlato2Disponible;
         FETCH vPlato2Disponible INTO varIdPlato2, varPlatoDisponible2;
         CLOSE vPlato2Disponible;
-
+        
         IF varIdPlato2 IS NULL THEN
             ROLLBACK;
             RAISE_APPLICATION_ERROR(-20004, msg_plato_inexistente_plato2);
         END IF;
-
+        
         IF varPlatoDisponible2 = 0 THEN
             RAISE_APPLICATION_ERROR(-20001, msg_plato_no_disponible);
         END IF;
@@ -177,7 +173,7 @@ create or replace procedure registrar_pedido(
 
     COMMIT;
   
-  EXCEPTION
+EXCEPTION
     WHEN pedido_sin_platos THEN
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20002, msg_pedido_sin_platos);
@@ -192,12 +188,11 @@ create or replace procedure registrar_pedido(
     
     WHEN plato_inexistente THEN
         ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20004, SQLERRM);
+        RAISE_APPLICATION_ERROR(-20004, SQLERRM);
         
     WHEN OTHERS THEN
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20099, 'Error inesperado: ' || SQLERRM);
-        
 end;
 /
 
@@ -363,7 +358,7 @@ begin
     begin
         inicializa_test;
         dbms_output.put_line('');
-        dbms_output.put_line('Test4: Primer plato no existe-----');
+        dbms_output.put_line('Test4: Primer plato no existe');
         registrar_pedido(1,1,4,2);
         commit;
         dbms_output.put_line('MAL: El pedido usa un primer plato que no existe.');
@@ -377,9 +372,8 @@ begin
                     dbms_output.put_line('MAL: Da error pero no detecta que el primer plato no existe.');
                     dbms_output.put_line('Error nro ' || SQLCODE);
                     dbms_output.put_line('Mensaje ' || SQLERRM);
-                end if;
-    end;
-
+                end if;
+    end;
     
     --Test5: Primer plato no existe Err: -20004
     begin
@@ -417,7 +411,6 @@ begin
                 dbms_output.put_line('Mensaje ' || SQLERRM);
     end;
     
-  
 end;
 /
 
