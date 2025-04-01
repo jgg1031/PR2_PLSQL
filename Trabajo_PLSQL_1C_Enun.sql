@@ -63,106 +63,137 @@ create or replace procedure registrar_pedido(
     arg_id_primer_plato INTEGER DEFAULT NULL,
     arg_id_segundo_plato INTEGER DEFAULT NULL
 ) is 
-    --Declaración de excepciones P4.5 (uso de excepciones propias)
-    plato_no_disponible exception;
-    pragma exception_init(plato_no_disponible, -20001);
+    --EXCEPCIONES
+    --Mensajes de excepciones
     msg_plato_no_disponible constant varchar(50) := 'Uno de los plato seleccionado no está disponible';
-    
-    pedido_sin_platos exception;
-    pragma exception_init(pedido_sin_platos, -20002);
     msg_pedido_sin_platos constant varchar(50) := 'El pedido debe contener al menos un plato';
-    
-    personal_ocupado exception;
-    pragma exception_init(personal_ocupado, -20003);
     msg_personal_ocupado constant varchar(50) := 'El personal de servicio tiene demasiados pedidos';
-    
-    plato_inexistente exception;
-    pragma exception_init(plato_inexistente, -20004);
     msg_plato_inexistente_plato1 constant varchar(50) := 'El primer plato seleccionado no existe';
     msg_plato_inexistente_plato2 constant varchar(50) := 'El segundo plato seleccionado no existe';
     
+    --Declaración de excepciones P4.5 (uso de excepciones propias)
+    plato_no_disponible exception;
+    pragma exception_init(plato_no_disponible, -20001);
+    pedido_sin_platos exception;
+    pragma exception_init(pedido_sin_platos, -20002);
+    personal_ocupado exception;
+    pragma exception_init(personal_ocupado, -20003);
+    plato_inexistente exception;
+    pragma exception_init(plato_inexistente, -20004);
+    
+    --VARIABLES    
     --Declaración de cursores
     CURSOR vPlato1Disponible IS 
         SELECT id_plato, disponible FROM platos WHERE id_plato = arg_id_primer_plato;
-
-    varIdPlato1 platos.id_plato%type;
-    varPlatoDisponible1 platos.disponible%type;
     
     CURSOR vPlato2Disponible IS
         SELECT id_plato, disponible FROM platos WHERE id_plato = arg_id_segundo_plato;
 
+    --Declaración de variables
+    varIdPlato1 platos.id_plato%type;
+    varPlatoDisponible1 platos.disponible%type;
     varIdPlato2 platos.id_plato%type;
     varPlatoDisponible2 platos.disponible%type;
-        
-    --Personal disponible
     varPersonalDisponible personal_servicio.pedidos_activos%type;
-    
-    varTotalPedido pedidos.total%type;
-    var_id_pedido pedidos.id_pedido%type;
+    varTotalPedido PEDIDOS.total%type;
+    var_id_pedido PEDIDOS.id_pedido%type;
     
  begin
     
-    OPEN vPlato1Disponible;
-    FETCH vPlato1Disponible INTO varIdPlato1, varPlatoDisponible1;
-    
-    OPEN vPlato2Disponible;
-    FETCH vPlato2Disponible INTO varIdPlato2, varPlatoDisponible2;
-    
-    --Comprobar que los platos están disponibles P4.5(Comprobaciones previas)
-    IF NVL(varPlatoDisponible1, 1) = 0 OR NVL(varPlatoDisponible2, 1) = 0
-    THEN
+    -- Comprobar que al menos un plato ha sido seleccionado
+    IF arg_id_primer_plato IS NULL AND arg_id_segundo_plato IS NULL THEN
+        RAISE pedido_sin_platos;
+    END IF;
+
+    -- Verificar disponibilidad del primer plato
+    IF arg_id_primer_plato IS NOT NULL THEN
+        OPEN vPlato1Disponible;
+        FETCH vPlato1Disponible INTO varIdPlato1, varPlatoDisponible1;
         CLOSE vPlato1Disponible;
+
+        IF varIdPlato1 IS NULL THEN
+            ROLLBACK;
+            RAISE_APPLICATION_ERROR(-20004, msg_plato_inexistente_plato1);
+        END IF;
+
+        IF varPlatoDisponible1 = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, msg_plato_no_disponible);
+        END IF;
+    END IF;
+
+    -- Verificar disponibilidad del segundo plato
+    IF arg_id_segundo_plato IS NOT NULL THEN
+        OPEN vPlato2Disponible;
+        FETCH vPlato2Disponible INTO varIdPlato2, varPlatoDisponible2;
         CLOSE vPlato2Disponible;
-        ROLLBACK;
-        raise_application_error(-20001, msg_plato_no_disponible);
+
+        IF varIdPlato2 IS NULL THEN
+            ROLLBACK;
+            RAISE_APPLICATION_ERROR(-20004, msg_plato_inexistente_plato2);
+        END IF;
+
+        IF varPlatoDisponible2 = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, msg_plato_no_disponible);
+        END IF;
+    END IF;
+
+    -- Verificar disponibilidad del personal de servicio
+    SELECT pedidos_activos INTO varPersonalDisponible 
+    FROM personal_servicio 
+    WHERE id_personal = arg_id_personal
+    FOR UPDATE;
+
+    IF varPersonalDisponible >= 5 THEN
+        RAISE personal_ocupado;
     END IF;
     
-    --Comprobar que se pasan al menos un plato
-    IF arg_id_primer_plato IS NULL AND arg_id_segundo_plato IS NULL
-    THEN
-        ROLLBACK; --P4.5 (Rollback para evitar estados incorrectos)
-        raise_application_error(-20002, msg_pedido_sin_platos);
-    END IF;
-    
-    --Comprobar que el personal tiene suficientes pedidos
-    SELECT pedidos_activos INTO varPersonalDisponible FROM personal_servicio --P4.1
-        WHERE id_personal = arg_id_personal
-        FOR UPDATE; --P4.2 usamos el for update para evitar que otro proceso modifique pedidos_activos
-    IF varPersonalDisponible >  5 --P4.1 aqui se comprueba que el personal no tiene mas de 5 platos
-    THEN 
-        ROLLBACK;
-        raise_application_error(-20003, msg_personal_ocupado);
-    END IF;
- 
-    --Comprobar que el primer plato existe
-    IF varIdPlato1 IS NULL
-    THEN
-        CLOSE vPlato1Disponible;
-        ROLLBACK;
-        raise_application_error(-20004, msg_plato_inexistente_plato1);
-    END IF;
-    
-    --Comprobar que el segundo plato existe
-    IF varIdPlato2 IS NULL
-    THEN
-        CLOSE vPlato2Disponible;
-        ROLLBACK;
-        raise_application_error(-20004, msg_plato_inexistente_plato2); --P4.5 (mostramos mensajes claros con el tipo de error)
-    END IF;
-    
+    -- Obtener ID del pedido
     var_id_pedido := seq_pedidos.NEXTVAL;
-  --Obtener la suma del total del pedido
-  SELECT SUM(precio) INTO varTotalPedido FROM platos WHERE id_plato IN (arg_id_primer_plato, arg_id_segundo_plato);
-  --Añadir pedido a la tabla de pedidos
-  INSERT INTO pedidos (id_pedido, id_cliente, id_personal, fecha_pedido, total) VALUES(var_id_pedido ,arg_id_cliente, arg_id_personal, SYSDATE, varTotalPedido);
-  --Añadir los detalles del pedido
-  INSERT INTO detalles_pedido VALUES(var_id_pedido, arg_id_primer_plato);
-  INSERT INTO detalles_pedido VALUES(var_id_pedido, arg_id_segundo_plato);
+
+    -- Calcular total del pedido
+    SELECT COALESCE(SUM(precio), 0) INTO varTotalPedido 
+    FROM platos 
+    WHERE id_plato IN (arg_id_primer_plato, arg_id_segundo_plato);
+
+    -- Insertar el pedido
+    INSERT INTO pedidos (id_pedido, id_cliente, id_personal, fecha_pedido, total) 
+    VALUES (var_id_pedido, arg_id_cliente, arg_id_personal, SYSDATE, varTotalPedido);
+
+    -- Insertar detalles del pedido (solo si los platos no son NULL)
+    IF arg_id_primer_plato IS NOT NULL THEN
+        INSERT INTO detalle_pedido (id_pedido, id_plato, cantidad) 
+        VALUES (var_id_pedido, arg_id_primer_plato, 1);
+    END IF;
+
+    IF arg_id_segundo_plato IS NOT NULL THEN
+        INSERT INTO detalle_pedido (id_pedido, id_plato, cantidad) 
+        VALUES (var_id_pedido, arg_id_segundo_plato, 1);
+    END IF;
+
+    -- Actualizar pedidos activos del personal
+    UPDATE personal_servicio 
+    SET pedidos_activos = pedidos_activos + 1 
+    WHERE id_personal = arg_id_personal;
+
+    COMMIT;
   
-  --Añadir un pedido mas al personal
-  UPDATE personal_servicio SET pedidos_activos = ((SELECT pedidos_activos FROM personal_servicio WHERE id_personal = arg_id_personal) + 1) WHERE id_personal = arg_id_personal;
-  
-  
+  EXCEPTION
+    WHEN pedido_sin_platos THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20002, msg_pedido_sin_platos);
+
+    WHEN plato_no_disponible THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20001, msg_plato_no_disponible);
+
+    WHEN personal_ocupado THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20003, msg_personal_ocupado);
+    
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20099, 'Error inesperado: ' || SQLERRM);
+        
 end;
 /
 
@@ -172,7 +203,8 @@ end;
 --  Para garantizar que un miembro del personal no supera el límite de pedidos activos lo definimos en el procedimiento 'registrar_pedido'. Antes de registrar el pedido se verifica cuantos pedidos activos tiene el miembro del personal, si es mayor a 5 se lanza una excepción que impide la asignacion del pedido. 
 
 -- * P4.2
---  Para evitar este suceso, utilizaremos una cláusula (SELECT ... FOR UPDATE). De esta manera se bloquea la fila del personal de servicio evitando que otro proceso modifique 'pedidos_activos' simultanea.
+--  Para evitar este suceso, utilizaremos una cláusula (SELECT ... FOR UPDATE) en la comprobación de la disponibilidad del peronal. 
+--  De esta manera se bloquea la fila del personal de servicio evitando que otro proceso modifique 'pedidos_activos' simultanea.
 
 -- * P4.3
 --  
@@ -239,6 +271,9 @@ begin
 end;
 /
 
+
+
+
 exec inicializa_test;
 
 -- Completa lost test, incluyendo al menos los del enunciado y añadiendo los que consideres necesarios
@@ -247,9 +282,6 @@ create or replace procedure test_registrar_pedido is
 begin
 	 
   --caso 1 Pedido correct, se realiza
-  begin
-    inicializa_test;
-  end;
   
   -- Idem para el resto de casos
 
@@ -259,6 +291,77 @@ begin
      - Personal de servicio ya tiene 5 pedidos activos y se le asigna otro pedido devuelve el error -20003
      - ... los que os puedan ocurrir que puedan ser necesarios para comprobar el correcto funcionamiento del procedimiento
 */
+    --Test1: Plato no disponible Err: -20001
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('Test1: Un plato no está disponible');
+        registrar_pedido(1,1,2,3);
+        commit;
+        dbms_output.put_line('MAL: Plato no disponible usado.');
+        exception
+            when others then
+                if SQLCODE = -20001 then
+                    dbms_output.put_line('BIEN: Plato no usado exitosamente.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                else
+                    dbms_output.put_line('MAL: Da error pero no detecta que el plato no está disponible.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                end if;
+    end;
+    
+    --Test2: Plato no disponible Err: -20002
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('Test2: El pedido tiene que contener al menos un plato');
+        registrar_pedido(1,1,null,null);
+        commit;
+        dbms_output.put_line('MAL: El pedido usa platos sin id.');
+        exception
+            when others then
+                if SQLCODE = -20002 then
+                    dbms_output.put_line('BIEN: Plato no usado exitosamente.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                else
+                    dbms_output.put_line('MAL: Da error pero no detecta que el plato no es nulo.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                end if;
+    end;
+    
+    --Test3: Personal con demasiados pedidos Err: -20003
+    begin
+        inicializa_test;
+        dbms_output.put_line('');
+        dbms_output.put_line('Test3: Personal de servicio con demasiados pedidos');
+        registrar_pedido(1,2,1,2);
+        commit;
+        dbms_output.put_line('MAL: El pedido usa un personal que no está disponible.');
+        exception
+            when others then
+                if SQLCODE = -20003 then
+                    dbms_output.put_line('BIEN: El personal no es usado correctamente.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                else
+                    dbms_output.put_line('MAL: Da error pero no detecta que el personal no se puede usar.');
+                    dbms_output.put_line('Error nro ' || SQLCODE);
+                    dbms_output.put_line('Mensaje ' || SQLERRM);
+                end if;
+    end;
+    
+    --Test4: Primer plato no existe Err: -20004
+    
+    
+    --Test5: Primer plato no existe Err: -20004
+    
+    
+    --Test6: El pedido se hace correctamente
+    
   
 end;
 /
@@ -266,3 +369,5 @@ end;
 
 set serveroutput on;
 exec test_registrar_pedido;
+
+
