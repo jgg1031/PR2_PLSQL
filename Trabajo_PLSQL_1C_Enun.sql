@@ -233,15 +233,16 @@ end;
 ------ Deja aquí tus respuestas a las preguntas del enunciado:
 -- NO SE CORREGIRÁN RESPUESTAS QUE NO ESTÉN AQUÍ (utiliza el espacio que necesites apra cada una)
 -- * P4.1
---  Para garantizar que un miembro del personal no supera el límite de pedidos activos lo definimos en el procedimiento 'registrar_pedido'. Antes de registrar el pedido se verifica cuantos pedidos activos tiene el miembro del personal, si es mayor a 5 se lanza una excepción que impide la asignacion del pedido. 
+--  Para garantizar que un miembro del personal no supera el límite de pedidos activos lo definimos en el procedimiento 'registrar_pedido'. 
+--  Antes de registrar el pedido se verifica cuantos pedidos activos tiene el miembro del personal, si es mayor a 5 se lanza una excepción que impide la asignacion del pedido. 
 
 -- * P4.2
 --  Para evitar este suceso, utilizaremos una cláusula (SELECT ... FOR UPDATE) en la comprobación de la disponibilidad del peronal. 
 --  De esta manera se bloquea la fila del personal de servicio evitando que otro proceso modifique 'pedidos_activos' simultanea.
 
 -- * P4.3
---  Para evitar que ocurran inconsistencias, usamos la misma estrategia que en la pregunta 3, pero para las demás consultas, así antes de realizar cualquier modificación en las inserciones, tenemos bloqueadas las filas que van a 
---  ser modificadas o consultadas por otras sesiones.
+--  Para evitar que ocurran inconsistencias, usamos la misma estrategia que en la pregunta 3, pero para las demás consultas, así antes de realizar cualquier modificación en las inserciones, 
+--  tenemos bloqueadas las filas que van a ser modificadas o consultadas por otras sesiones.
 
 -- * P4.4
 -- Si se añade `CHECK (pedidos_activos <= 5)`, la base de datos bloqueará valores inválidos, pero el procedimiento debe capturar el error. Por ejemplo, con `pedidos_activos = 0`, 
